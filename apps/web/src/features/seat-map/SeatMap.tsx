@@ -10,13 +10,15 @@ interface Props {
   cabin: string;
   selected: string[];
   onToggle: (seat: Seat) => void;
+  /** Called when the viewer clicks a seat they already hold in another booking. */
+  onOwnHeldSeat?: (seat: Seat) => void;
 }
 
 const VISUAL_CLASSES: Record<SeatVisual, string> = {
   selected: 'border-saffron-600 bg-saffron-600 text-white shadow-md',
   available: 'border-teal-600/60 bg-surface text-teal-700 hover:border-teal-700 hover:bg-teal-50',
   held: 'bg-stripes-amber border-amber-100 text-amber-700/70 cursor-not-allowed',
-  mine: 'border-2 border-saffron-400 bg-saffron-50 text-saffron-700 cursor-not-allowed',
+  mine: 'border-2 border-saffron-400 bg-saffron-50 text-saffron-700 hover:bg-saffron-100',
   booked: 'border-transparent bg-navy-100 text-navy-200 cursor-not-allowed',
   blocked: 'border-transparent bg-line text-muted/50 cursor-not-allowed',
   'other-cabin': 'border-line bg-canvas text-muted/60 opacity-50 cursor-not-allowed',
@@ -32,7 +34,7 @@ function SeatGlyph({ seat, visual }: { seat: Seat; visual: SeatVisual }) {
  * Aircraft seat map driven entirely by layout data from the API. Uses a roving tabindex:
  * one seat is tabbable, arrow keys move between seats, Enter/Space selects.
  */
-export function SeatMap({ map, cabin, selected, onToggle }: Props) {
+export function SeatMap({ map, cabin, selected, onToggle, onOwnHeldSeat }: Props) {
   const byLabel = useMemo(() => new Map(map.seats.map((s) => [s.label, s])), [map.seats]);
   const rows = useMemo(() => {
     const r = new Map<number, Map<string, Seat>>();
@@ -202,10 +204,13 @@ export function SeatMap({ map, cabin, selected, onToggle }: Props) {
                               tabIndex={focused === seat.label ? 0 : -1}
                               aria-label={seatAriaLabel(seat, visual)}
                               aria-pressed={isSelected}
-                              aria-disabled={!interactive}
+                              aria-disabled={!interactive && visual !== 'mine'}
                               onFocus={() => setFocused(seat.label)}
                               onKeyDown={(e) => onKeyDown(e, seat)}
-                              onClick={() => interactive && onToggle(seat)}
+                              onClick={() => {
+                                if (interactive) onToggle(seat);
+                                else if (visual === 'mine') onOwnHeldSeat?.(seat);
+                              }}
                               className={cn(
                                 'flex items-center justify-center rounded-t-lg rounded-b-md border transition-colors',
                                 seatSize,
@@ -260,6 +265,7 @@ export function SeatLegend({ surcharges }: { surcharges: { legroom?: string; exi
     >
       {item('border-teal-600/60 bg-surface', 'Available')}
       {item('border-saffron-600 bg-saffron-600', 'Your selection')}
+      {item('border-2 border-saffron-400 bg-saffron-50', 'Held by you')}
       {item('bg-stripes-amber border-amber-100', 'Held by others')}
       {item('border-transparent bg-navy-100', 'Booked')}
       {item(

@@ -288,6 +288,48 @@ describe('Seat holds (booking-as-hold)', () => {
     });
   });
 
+  describe('resuming a hold from the seat map', () => {
+    it('lists the viewer’s own active holds so they can resume or release them', async () => {
+      const a = await signedInAgent(ctx.app, 'Asha');
+      const b = await signedInAgent(ctx.app, 'Bilal');
+      const res = await a.hold(economy(['2A', '2C'])).expect(201);
+
+      const mine = await a.agent.get(`/api/v1/flights/${fx.flightId}/seat-map`).expect(200);
+      expect(mine.body.yourHolds).toEqual([
+        {
+          reference: res.body.reference,
+          status: 'PENDING',
+          seats: ['2A', '2C'],
+          holdExpiresAt: res.body.holdExpiresAt,
+        },
+      ]);
+
+      // Other travellers and visitors never learn whose hold it is.
+      const other = await b.agent.get(`/api/v1/flights/${fx.flightId}/seat-map`).expect(200);
+      expect(other.body.yourHolds).toEqual([]);
+      const anon = await request(ctx.app.getHttpServer())
+        .get(`/api/v1/flights/${fx.flightId}/seat-map`)
+        .expect(200);
+      expect(anon.body.yourHolds).toEqual([]);
+      expect(JSON.stringify(anon.body)).not.toContain(res.body.reference);
+    });
+
+    it('drops a hold from the list once it expires or is released', async () => {
+      const a = await signedInAgent(ctx.app, 'Asha');
+      const first = await a.hold(economy(['2A'])).expect(201);
+      const second = await a.hold(economy(['2C'])).expect(201);
+      await expireNow(first.body.reference);
+      await a.del(`/api/v1/bookings/${second.body.reference}`).expect(204);
+
+      const map = await a.agent.get(`/api/v1/flights/${fx.flightId}/seat-map`).expect(200);
+      expect(map.body.yourHolds).toEqual([]);
+      const states = Object.fromEntries(
+        map.body.seats.map((s: { label: string; state: string }) => [s.label, s.state]),
+      );
+      expect(states).toMatchObject({ '2A': 'AVAILABLE', '2C': 'AVAILABLE' });
+    });
+  });
+
   describe('seat map', () => {
     it('describes the layout with aisles, seat kinds and surcharges', async () => {
       const res = await request(ctx.app.getHttpServer())

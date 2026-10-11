@@ -24,10 +24,20 @@ export class SeatDto {
   surcharge!: Money | null;
 }
 
+/** A booking of the viewer's that currently holds seats on this flight. */
+export class YourHoldDto {
+  reference!: string;
+  status!: 'PENDING' | 'PAYMENT_PENDING';
+  seats!: string[];
+  holdExpiresAt!: string;
+}
+
 export class SeatMapResponse {
   flightId!: string;
   cabins!: SeatMapCabinDto[];
   seats!: SeatDto[];
+  /** Signed-in viewer's own active holds on this flight (empty for visitors). */
+  yourHolds!: YourHoldDto[];
   /** How long a seat hold lasts once seats are reserved. */
   holdTtlSeconds!: number;
   /** Informational snapshot; availability is re-validated when seats are held. */

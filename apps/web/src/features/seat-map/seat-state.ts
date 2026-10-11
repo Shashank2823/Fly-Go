@@ -28,7 +28,7 @@ const STATE_TEXT: Record<SeatVisual, string> = {
   selected: 'selected',
   available: 'available',
   held: 'temporarily held by another traveller',
-  mine: 'held by you in another booking',
+  mine: 'already held by you — continue or release it above the seat map',
   booked: 'booked',
   blocked: 'unavailable',
   'other-cabin': 'in a different cabin',

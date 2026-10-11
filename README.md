@@ -3,6 +3,7 @@
 A production-oriented flight booking platform: NestJS modular monolith + separate worker process, React/Vite SPA, PostgreSQL (source of truth), Redis/BullMQ, MongoDB (ticket snapshots, email history, notifications).
 
 - Design: [docs/phase-1-system-design.md](docs/phase-1-system-design.md)
+- How it works (PostgreSQL vs Redis vs MongoDB, caching, where the code lives): [docs/how-it-works.md](docs/how-it-works.md)
 - Status: **Phase 4 (flight search UI, seat maps, concurrency-safe seat holds, hold expiry) complete.** Flights are sample data, not live airline inventory.
 
 ## Layout

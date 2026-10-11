@@ -59,8 +59,17 @@ export interface Seat {
   surcharge: Money | null;
 }
 
+export interface YourHold {
+  reference: string;
+  status: 'PENDING' | 'PAYMENT_PENDING';
+  seats: string[];
+  holdExpiresAt: string;
+}
+
 export interface SeatMap {
   flightId: string;
+  /** The signed-in viewer's own active holds on this flight. */
+  yourHolds: YourHold[];
   cabins: { cabin: string; firstRow: number; lastRow: number; columns: (string | null)[] }[];
   seats: Seat[];
   holdTtlSeconds: number;

@@ -11,6 +11,7 @@ import { Card } from '../components/ui/Card';
 import { Skeleton, Spinner } from '../components/ui/Skeleton';
 import { FlightStrip } from '../features/booking/FlightStrip';
 import { SeatLegend, SeatMap } from '../features/seat-map/SeatMap';
+import { YourHoldBanner } from '../features/booking/YourHoldBanner';
 import { addMoney, CABIN_LABELS, formatMoney, passengerSummary } from '../lib/format';
 
 const KIND_LABEL: Record<string, string> = {
@@ -51,6 +52,8 @@ export function SeatSelectionPage() {
   const [error, setError] = useState<string | null>(null);
   // One idempotency key per distinct selection: retries of the same intent reuse it.
   const keys = useRef(new Map<string, string>());
+  const holdBannerRef = useRef<HTMLDivElement>(null);
+  const [highlightHold, setHighlightHold] = useState(false);
 
   // Drop selections that became unavailable on a refresh.
   useEffect(() => {
@@ -132,6 +135,15 @@ export function SeatSelectionPage() {
     }
   };
 
+  const onOwnHeldSeat = (seat: Seat) => {
+    setNotice(
+      `Seat ${seat.label} is already held for you. Continue with that booking, or release it to choose again.`,
+    );
+    setHighlightHold(true);
+    holdBannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    holdBannerRef.current?.querySelector<HTMLElement>('a, button')?.focus({ preventScroll: true });
+  };
+
   if (flight.isError || seatMap.isError) {
     const err = flight.error ?? seatMap.error;
     return (
@@ -176,6 +188,21 @@ export function SeatSelectionPage() {
               {infants > 0 && ' Infants travel on an adult’s lap and don’t need a seat.'}
             </p>
           </div>
+          {seatMap.data?.yourHolds.map((h, i) => (
+            <YourHoldBanner
+              key={h.reference}
+              ref={i === 0 ? holdBannerRef : undefined}
+              hold={h}
+              serverTime={seatMap.data.generatedAt}
+              receivedAt={seatMap.dataUpdatedAt}
+              highlighted={highlightHold}
+              onReleased={() => {
+                setNotice(null);
+                setHighlightHold(false);
+                void seatMap.refetch();
+              }}
+            />
+          ))}
           <SeatLegend
             surcharges={{
               legroom: surchargeFor('EXTRA_LEGROOM')
@@ -187,7 +214,13 @@ export function SeatSelectionPage() {
           {notice && <Alert tone="info">{notice}</Alert>}
           <div className="overflow-x-auto pb-2">
             {seatMap.data ? (
-              <SeatMap map={seatMap.data} cabin={cabin} selected={selected} onToggle={toggle} />
+              <SeatMap
+                map={seatMap.data}
+                cabin={cabin}
+                selected={selected}
+                onToggle={toggle}
+                onOwnHeldSeat={onOwnHeldSeat}
+              />
             ) : (
               <div className="mx-auto w-72 space-y-2 py-6">
                 {Array.from({ length: 10 }, (_, i) => (

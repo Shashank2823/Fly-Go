@@ -29,13 +29,12 @@ export class SeatMapService {
     if (!flight) throw new AppError('FLIGHT_NOT_FOUND', HttpStatus.NOT_FOUND, 'Flight not found');
 
     const market = await this.markets.resolve(viewer?.nationality);
-    const [rows, rules, mine] = await Promise.all([
+    const [rows, rules, holds] = await Promise.all([
       this.seats.seatMap(flightId),
       this.markets.activeRules(market.code),
-      viewer
-        ? this.seats.activeBookingIdsForUser(viewer.id, flightId)
-        : Promise.resolve(new Set<string>()),
+      viewer ? this.seats.activeHoldsForUser(viewer.id, flightId) : Promise.resolve([]),
     ]);
+    const mine = new Set(holds.map((h) => h.id));
     const surchargeByKind = new Map(
       rules
         .filter((r) => r.kind === 'SEAT_KIND_SURCHARGE' && r.seatKind)
@@ -72,6 +71,17 @@ export class SeatMapService {
           surcharge: extra ? toMoney(extra, market.currency) : null,
         };
       }),
+      // Lets the viewer resume or release a hold they left behind (e.g. after navigating away).
+      yourHolds: holds
+        .map((h) => ({
+          reference: h.reference,
+          status: h.status as 'PENDING' | 'PAYMENT_PENDING',
+          seats: rows
+            .filter((r) => r.booking_id === h.id && state(r) === 'HELD_BY_YOU')
+            .map((r) => r.seat_label),
+          holdExpiresAt: h.holdExpiresAt!.toISOString(),
+        }))
+        .filter((h) => h.seats.length > 0),
       holdTtlSeconds: this.config.get('HOLD_TTL_SECONDS'),
       generatedAt: new Date(now).toISOString(),
     };

@@ -26,7 +26,8 @@ export class MaintenanceProcessor extends WorkerHost {
       case MaintenanceJob.WorkerHeartbeat:
         // Written by a job (not a timer) so it proves the whole scheduler → queue → worker path.
         await this.redis.set(WORKER_HEARTBEAT_KEY, new Date().toISOString(), 'EX', 120);
-        this.logger.debug({ jobId: job.id }, 'heartbeat');
+        // verbose (pino "trace"): every 10 s is too chatty for debug logs.
+        this.logger.verbose({ jobId: job.id }, 'heartbeat');
         return;
       case MaintenanceJob.ExpireHolds: {
         const expired = await this.holdExpiry.expireAbandonedHolds();

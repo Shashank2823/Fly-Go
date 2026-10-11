@@ -111,12 +111,17 @@ export class SeatInventoryRepository {
       RETURNING b.id, b.reference, b.user_id, b.flight_id`;
   }
 
-  /** Bookings the viewer currently holds on this flight (to mark HELD_BY_YOU). */
-  async activeBookingIdsForUser(userId: string, flightId: string): Promise<Set<string>> {
-    const rows = await this.prisma.booking.findMany({
-      where: { userId, flightId, status: { in: ['PENDING', 'PAYMENT_PENDING'] } },
-      select: { id: true },
+  /** The viewer's unexpired holds on this flight (to mark HELD_BY_YOU and offer resume/release). */
+  activeHoldsForUser(userId: string, flightId: string) {
+    return this.prisma.booking.findMany({
+      where: {
+        userId,
+        flightId,
+        status: { in: ['PENDING', 'PAYMENT_PENDING'] },
+        holdExpiresAt: { gt: new Date() },
+      },
+      select: { id: true, reference: true, status: true, holdExpiresAt: true },
+      orderBy: { createdAt: 'asc' },
     });
-    return new Set(rows.map((r) => r.id));
   }
 }
