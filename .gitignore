@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output & caches
+dist/
+dist-worker/
+coverage/
+*.tsbuildinfo
+apps/api/src/generated/
+
+# Local environment & secrets — never commit (use .env.example)
+.env
+.env.*
+!.env.example
+
+# Runtime data
+var/
+*.log
+
+# Test reports
+playwright-report/
+test-results/
+
+# Editor / OS / local tooling
+.DS_Store
+.idea/
+.vscode/
+.claude/

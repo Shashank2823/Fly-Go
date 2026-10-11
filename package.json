@@ -1,0 +1,41 @@
+{
+  "name": "flygo",
+  "private": true,
+  "description": "FlyGo — production-oriented flight booking platform (modular monolith)",
+  "workspaces": [
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "env:init": "./scripts/env-init.sh",
+    "infra:up": "docker compose --env-file .env -f infra/docker/docker-compose.yml up -d --wait",
+    "infra:down": "docker compose --env-file .env -f infra/docker/docker-compose.yml down",
+    "infra:ps": "docker compose --env-file .env -f infra/docker/docker-compose.yml ps",
+    "db:bootstrap": "./scripts/db-bootstrap.sh",
+    "db:migrate": "npm run db:migrate -w @flygo/api",
+    "db:migrate:deploy": "npm run db:migrate:deploy -w @flygo/api",
+    "db:seed": "npm run db:seed -w @flygo/api",
+    "dev:api": "npm run start:dev -w @flygo/api",
+    "dev:worker": "npm run worker:dev -w @flygo/api",
+    "dev:web": "npm run dev -w @flygo/web",
+    "build": "npm run build --workspaces",
+    "lint": "npm run lint --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test --workspaces",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:int": "npm run test:int -w @flygo/api"
+  },
+  "devDependencies": {
+    "prettier": "3.9.10"
+  },
+  "overrides": {
+    "mysql2": "3.24.5",
+    "deepmerge-ts": "8.0.2",
+    "@nestjs/swagger": {
+      "js-yaml": "5.4.3"
+    }
+  }
+}

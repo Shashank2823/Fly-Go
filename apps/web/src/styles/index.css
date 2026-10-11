@@ -1,0 +1,84 @@
+@import 'tailwindcss';
+
+/*
+ * FlyGo design tokens.
+ * Navy carries structure and trust, saffron is reserved for the one primary action per view,
+ * teal signals availability/success. Monospace is used for codes, times and references
+ * (a boarding-pass cue). All text/background pairs meet WCAG AA (≥ 4.5:1).
+ */
+@theme {
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  --color-ink: #0b1b33;
+  --color-muted: #5b6474;
+  --color-line: #e5e1d8;
+  --color-canvas: #f7f5f0;
+  --color-surface: #ffffff;
+
+  --color-navy-50: #f1f4fa;
+  --color-navy-100: #e3e9f4;
+  --color-navy-200: #c4d0e6;
+  --color-navy-700: #1c4380;
+  --color-navy-800: #13305e;
+  --color-navy-900: #0a1f44;
+  --color-navy-950: #061229;
+
+  --color-saffron-50: #fff4ec;
+  --color-saffron-100: #ffe3cf;
+  --color-saffron-300: #f7b184;
+  --color-saffron-400: #f2884b;
+  --color-saffron-500: #e06a2b;
+  --color-saffron-600: #c2541b;
+  --color-saffron-700: #9c4114;
+
+  --color-teal-50: #e6f6f4;
+  --color-teal-100: #c5ebe6;
+  --color-teal-600: #0d8b82;
+  --color-teal-700: #0f766e;
+
+  --color-amber-50: #fef3e2;
+  --color-amber-100: #fde2b8;
+  --color-amber-700: #b54708;
+
+  --color-danger: #b42318;
+  --color-danger-50: #fef0ee;
+
+  --radius-card: 16px;
+  --shadow-card: 0 1px 2px rgb(11 27 51 / 0.04), 0 4px 16px rgb(11 27 51 / 0.06);
+  --shadow-lift: 0 2px 4px rgb(11 27 51 / 0.06), 0 12px 32px rgb(11 27 51 / 0.12);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  @apply bg-canvas text-ink font-sans antialiased;
+  font-feature-settings: 'ss01', 'cv11';
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-navy-700);
+  outline-offset: 2px;
+}
+
+/* Diagonal stripes for "held by someone else" seats. */
+.bg-stripes-amber {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--color-amber-100) 0 4px,
+    var(--color-amber-50) 4px 8px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

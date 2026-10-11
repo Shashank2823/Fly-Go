@@ -1,0 +1,94 @@
+# FlyGo supporting infrastructure.
+# PostgreSQL is NOT defined here by default: we reuse the existing `empire_db` server
+# (see docs/phase-1-system-design.md §18). The `own-postgres` profile is an opt-in fallback.
+#
+# Usage (from repo root): npm run infra:up
+name: flygo
+
+services:
+  redis:
+    image: redis:7.4.11-alpine
+    command:
+      - redis-server
+      - --appendonly
+      - 'yes'
+      - --appendfsync
+      - everysec
+      # BullMQ requires noeviction: evicting queue keys silently corrupts queues.
+      - --maxmemory-policy
+      - noeviction
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - flygo_redis:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli -a "$$REDIS_PASSWORD" --no-auth-warning ping | grep PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:8.0.32
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:?MONGO_ROOT_USER is required}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?MONGO_ROOT_PASSWORD is required}
+      MONGO_INITDB_DATABASE: ${MONGODB_DB:-flygo}
+      MONGO_APP_USER: ${MONGO_APP_USER:?MONGO_APP_USER is required}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:?MONGO_APP_PASSWORD is required}
+    ports:
+      - '${MONGO_PORT:-27017}:27017'
+    volumes:
+      - flygo_mongo:/data/db
+      - ./mongo/init-app-user.js:/docker-entrypoint-initdb.d/init-app-user.js:ro
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.31.4
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_MAX_MESSAGES: 5000
+    ports:
+      - '${SMTP_PORT:-1025}:1025'
+      - '${MAILPIT_UI_PORT:-8025}:8025'
+    volumes:
+      - flygo_mailpit:/data
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  # Opt-in only: `docker compose --profile own-postgres up -d`
+  postgres:
+    profiles: ['own-postgres']
+    image: postgres:16.10-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${OWN_POSTGRES_SUPERUSER_PASSWORD:-change-me}
+    ports:
+      - '5433:5432'
+    volumes:
+      - flygo_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  flygo_redis:
+  flygo_mongo:
+  flygo_mailpit:
+  flygo_pg:
