@@ -26,6 +26,7 @@ export class HealthIndicators {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     @Inject(MONGO_DB) private readonly mongo: Db,
     @InjectQueue(QueueName.Maintenance) private readonly maintenanceQueue: Queue,
+    @InjectQueue(QueueName.Payments) private readonly paymentsQueue: Queue,
     private readonly config: AppConfig,
   ) {}
 
@@ -84,13 +85,21 @@ export class HealthIndicators {
   async queues() {
     const check = this.health.check('queues');
     try {
-      const counts = await this.maintenanceQueue.getJobCounts(
-        'waiting',
-        'active',
-        'delayed',
-        'failed',
-      );
-      return check.up({ [QueueName.Maintenance]: counts });
+      const states = ['waiting', 'active', 'delayed', 'failed'] as const;
+      const [maintenance, payments] = await Promise.all([
+        this.maintenanceQueue.getJobCounts(...states),
+        this.paymentsQueue.getJobCounts(...states),
+      ]);
+      const outbox = await this.prisma.outboxEvent.groupBy({
+        by: ['status'],
+        _count: true,
+        where: { status: { in: ['PENDING', 'DEAD'] } },
+      });
+      return check.up({
+        [QueueName.Maintenance]: maintenance,
+        [QueueName.Payments]: payments,
+        outbox: Object.fromEntries(outbox.map((o) => [o.status, o._count])),
+      });
     } catch (err) {
       return check.down(errorMessage(err));
     }

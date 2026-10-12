@@ -4,7 +4,7 @@ A production-oriented flight booking platform: NestJS modular monolith + separat
 
 - Design: [docs/phase-1-system-design.md](docs/phase-1-system-design.md)
 - How it works (PostgreSQL vs Redis vs MongoDB, caching, where the code lives): [docs/how-it-works.md](docs/how-it-works.md)
-- Status: **Phase 4 (flight search UI, seat maps, concurrency-safe seat holds, hold expiry) complete.** Flights are sample data, not live airline inventory.
+- Status: **Phase 5 (passenger details, checkout, queue-driven mock payments, booking confirmation, My trips) complete.** Flights are sample data, not live airline inventory.
 
 ## Layout
 
@@ -58,13 +58,19 @@ npm run dev:web           # http://localhost:5173 (proxies /api to :3000)
 | `GET /auth/csrf`, `POST /auth/register`, `POST /auth/login` | public (CSRF token required for POST) |
 | `POST /auth/logout`, `GET /auth/me` | signed in |
 | `GET /airports?q=`, `GET /flights`, `GET /flights/:id`, `GET /flights/:id/seat-map`, `GET /reference/countries` | public |
-| `POST /bookings` (requires `Idempotency-Key`), `GET /bookings/:reference`, `DELETE /bookings/:reference` | signed in, own bookings only |
+| `GET /bookings`, `POST /bookings` (requires `Idempotency-Key`), `GET /bookings/:reference`, `DELETE /bookings/:reference` | signed in, own bookings only |
+| `PUT /bookings/:reference/passengers`, `POST /bookings/:reference/checkout` | signed in, own bookings only |
+| `POST /bookings/:reference/payments` (requires `Idempotency-Key`, returns 202), `GET /bookings/:reference/payments/:paymentId` | signed in, own bookings only |
 | `GET /health/live`, `GET /health/ready` | public |
 | `GET /health/workers` | `queue:inspect` permission (admins) |
 
-`POST /bookings` holds seats atomically for 10 minutes (booking status `PENDING`). The worker's
-`expire-holds` job (every 30 s) expires abandoned holds and frees their seats, so run
-`npm run dev:worker` alongside the API.
+`POST /bookings` holds seats atomically for 10 minutes (booking status `PENDING`). Payment is
+asynchronous: `POST …/payments` returns 202, and the **worker** submits it to the (mock) gateway,
+receives the simulated webhook and confirms the booking. **Run `npm run dev:worker` alongside the
+API** — without it payments stay "processing" and abandoned holds are not expired.
+
+The mock gateway always succeeds. To try the decline path, start the worker with
+`MOCK_PAYMENT_OUTCOME=fail npm run dev:worker`.
 
 Sessions are HttpOnly cookies backed by Redis; every POST/PUT/PATCH/DELETE must send the
 `X-CSRF-Token` header obtained from `GET /auth/csrf` (the web app does this automatically).

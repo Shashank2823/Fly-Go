@@ -53,5 +53,18 @@ export async function signedInAgent(app: NestExpressApplication, name: string) {
         .send(body),
     del: (url: string) =>
       b.agent.delete(url).set('X-CSRF-Token', b.csrf).set('Origin', 'http://localhost:5173'),
+    put: (url: string, body: object) =>
+      b.agent
+        .put(url)
+        .set('X-CSRF-Token', b.csrf)
+        .set('Origin', 'http://localhost:5173')
+        .send(body),
+    pay: (reference: string, priceVersion: number, key: string = crypto.randomUUID()) =>
+      b.agent
+        .post(`/api/v1/bookings/${reference}/payments`)
+        .set('X-CSRF-Token', b.csrf)
+        .set('Origin', 'http://localhost:5173')
+        .set('Idempotency-Key', key)
+        .send({ priceVersion }),
   };
 }

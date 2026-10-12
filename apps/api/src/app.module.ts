@@ -14,6 +14,7 @@ import { BookingsModule } from './modules/bookings/bookings.module';
 import { FlightsModule } from './modules/flights/flights.module';
 import { HealthModule } from './modules/health/health.module';
 import { OutboxModule } from './modules/outbox/outbox.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 import { ReferenceModule } from './modules/reference/reference.module';
 import { SeatInventoryModule } from './modules/seat-inventory/seat-inventory.module';
 import { QueuesModule } from './queues/queues.module';
@@ -36,6 +37,7 @@ import { QueuesModule } from './queues/queues.module';
     FlightsModule,
     SeatInventoryModule,
     BookingsModule,
+    PaymentsModule,
     HealthModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: ProblemDetailsFilter }],

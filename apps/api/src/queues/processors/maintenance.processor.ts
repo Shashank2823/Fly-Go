@@ -3,6 +3,8 @@ import { Inject, Logger } from '@nestjs/common';
 import { type Job, UnrecoverableError } from 'bullmq';
 import type Redis from 'ioredis';
 import { REDIS_CLIENT } from '../../infrastructure/redis/redis.module';
+import { OutboxRelayService } from '../../modules/outbox/outbox-relay.service';
+import { PaymentReconciliationService } from '../../modules/payments/payment-reconciliation.service';
 import { HoldExpiryService } from '../../modules/seat-inventory/hold-expiry.service';
 import { MaintenanceJob, QueueName, WORKER_HEARTBEAT_KEY } from '../queue-names';
 
@@ -17,6 +19,8 @@ export class MaintenanceProcessor extends WorkerHost {
   constructor(
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly holdExpiry: HoldExpiryService,
+    private readonly outboxRelay: OutboxRelayService,
+    private readonly reconciliation: PaymentReconciliationService,
   ) {
     super();
   }
@@ -34,6 +38,12 @@ export class MaintenanceProcessor extends WorkerHost {
         await job.updateProgress({ expired });
         return;
       }
+      case MaintenanceJob.OutboxRelay:
+        await this.outboxRelay.relayPending();
+        return;
+      case MaintenanceJob.ReconcilePayments:
+        await this.reconciliation.reconcile();
+        return;
       default:
         throw new UnrecoverableError(`Unknown maintenance job: ${job.name}`);
     }

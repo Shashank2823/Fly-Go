@@ -1,4 +1,4 @@
-import { ChevronDown, LogOut, User } from 'lucide-react';
+import { ChevronDown, Luggage, LogOut, User } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { type CurrentUser, useLogout } from '../../api/auth';
@@ -65,6 +65,14 @@ export function UserMenu({ user }: { user: CurrentUser }) {
             className="mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
           >
             <User className="size-4" aria-hidden /> Profile
+          </Link>
+          <Link
+            role="menuitem"
+            to="/bookings"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"
+          >
+            <Luggage className="size-4" aria-hidden /> My trips
           </Link>
           <button
             role="menuitem"

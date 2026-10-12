@@ -23,7 +23,19 @@ import { QUEUE_PREFIX, QueueName } from './queue-names';
         },
       }),
     }),
-    BullModule.registerQueue({ name: QueueName.Maintenance }),
+    BullModule.registerQueue(
+      { name: QueueName.Maintenance },
+      {
+        name: QueueName.Payments,
+        // Money-moving work: more patience before giving up (≈ 8 min of retries).
+        defaultJobOptions: {
+          attempts: 8,
+          backoff: { type: 'exponential', delay: 2_000 },
+          removeOnComplete: { age: 24 * 3600, count: 5_000 },
+          removeOnFail: { age: 30 * 24 * 3600 },
+        },
+      },
+    ),
   ],
   exports: [BullModule],
 })

@@ -11,3 +11,7 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+// Development-only debugging aid: inspect server state from the browser console.
+if (import.meta.env.DEV)
+  (globalThis as { __flygoQueryClient?: QueryClient }).__flygoQueryClient = queryClient;

@@ -36,6 +36,8 @@ export const envSchema = z.object({
 
   PAYMENTS_PROVIDER: z.enum(['mock']).default('mock'),
   MOCK_PAYMENT_DELAY_MS: z.coerce.number().int().min(0).default(1500),
+  /** Development/test only: force the mock gateway's outcome. */
+  MOCK_PAYMENT_OUTCOME: z.enum(['success', 'fail']).default('success'),
 });
 
 export type Env = z.infer<typeof envSchema>;

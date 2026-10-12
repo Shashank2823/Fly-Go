@@ -21,10 +21,15 @@ import { SeatInventoryRepository } from '../seat-inventory/seat-inventory.reposi
 import { newBookingReference } from './booking-reference';
 import { assertTransition } from './booking-state';
 import { ACTIVE_HOLD_STATUSES, BookingsRepository } from './bookings.repository';
-import type { BookingDetailDto, BookingSeatDto } from './dto/booking.responses';
+import type { BookingDetailDto, BookingListDto, BookingSeatDto } from './dto/booking.responses';
 import type { CreateBookingDto } from './dto/create-booking.dto';
 
 export const MAX_ACTIVE_HOLDS_PER_USER = 3;
+
+type BookingExtras = Pick<
+  BookingDetailDto,
+  'travellers' | 'contact' | 'price' | 'payment' | 'ticket' | 'confirmedAt'
+>;
 const CREATE_SCOPE = 'POST /bookings';
 
 const notFound = () => new AppError('BOOKING_NOT_FOUND', HttpStatus.NOT_FOUND, 'Booking not found');
@@ -262,7 +267,92 @@ export class BookingsService {
       rules: estimate?.rules ?? [],
       seatKinds: seats.map((s) => s.kind),
       now: new Date(),
+      extras: await this.loadExtras(booking),
     });
+  }
+
+  /** The caller's bookings, newest first. */
+  async listForUser(
+    user: AuthenticatedUser,
+    page: number,
+    pageSize: number,
+  ): Promise<BookingListDto> {
+    const [rows, totalItems] = await this.bookings.listForUser(user.id, page, pageSize);
+    return {
+      data: rows.map((b) => {
+        const activeHold = ACTIVE_HOLD_STATUSES.includes(b.status) && b.holdExpiresAt;
+        return {
+          reference: b.reference,
+          status: b.status,
+          cabin: b.cabin,
+          flight: toFlightHeader(b.flight),
+          seats: b.heldSeats.map((s) => s.seatLabel).sort(),
+          travellerCount: b.adults + b.children + b.infants,
+          total: b.totalMinor !== null ? toMoney(b.totalMinor, b.currency) : null,
+          holdExpiresAt: activeHold ? b.holdExpiresAt!.toISOString() : null,
+          createdAt: b.createdAt.toISOString(),
+        };
+      }),
+      page: { page, pageSize, totalItems, totalPages: Math.ceil(totalItems / pageSize) },
+    };
+  }
+
+  /** Passenger, final price, payment and ticket details for the booking detail view. */
+  private async loadExtras(booking: {
+    id: string;
+    currency: string;
+    totalMinor: bigint | null;
+    priceVersion: number;
+    contactEmail: string | null;
+    contactPhone: string | null;
+    confirmedAt: Date | null;
+  }): Promise<BookingExtras> {
+    const [passengers, lines, payment, ticket] = await Promise.all([
+      this.bookings.passengersWithSeats(booking.id),
+      booking.totalMinor !== null
+        ? this.bookings.priceLines(booking.id, booking.priceVersion)
+        : Promise.resolve([]),
+      this.bookings.latestPayment(booking.id),
+      this.bookings.latestTicket(booking.id),
+    ]);
+    const ordinalById = new Map(passengers.map((p) => [p.id, p.ordinal]));
+    return {
+      travellers: passengers.map((p) => ({
+        ordinal: p.ordinal,
+        type: p.type,
+        firstName: p.firstName,
+        lastName: p.lastName,
+        dateOfBirth: p.dateOfBirth.toISOString().slice(0, 10),
+        nationality: p.nationality,
+        seatLabel: p.seat?.flightSeat.seatLabel ?? null,
+      })),
+      contact: { email: booking.contactEmail, phone: booking.contactPhone },
+      price:
+        booking.totalMinor !== null
+          ? {
+              priceVersion: booking.priceVersion,
+              lines: lines.map((l) => ({
+                kind: l.kind,
+                code: l.code,
+                description: l.description,
+                passengerOrdinal: l.passengerId ? (ordinalById.get(l.passengerId) ?? null) : null,
+                amount: toMoney(l.amountMinor, booking.currency),
+              })),
+              total: toMoney(booking.totalMinor, booking.currency),
+            }
+          : null,
+      payment: payment
+        ? {
+            paymentId: payment.id,
+            status: payment.status,
+            amount: toMoney(payment.amountMinor, payment.currency),
+            failureCode: payment.failureCode,
+            succeededAt: payment.succeededAt?.toISOString() ?? null,
+          }
+        : null,
+      ticket: ticket ? { status: ticket.status, ticketNumber: ticket.ticketNumber } : null,
+      confirmedAt: booking.confirmedAt?.toISOString() ?? null,
+    };
   }
 
   /** Releases a PENDING hold. Idempotent: releasing an already released booking is a no-op. */
@@ -344,6 +434,7 @@ export class BookingsService {
     rules: Awaited<ReturnType<MarketsService['activeRules']>>;
     seatKinds: SeatKind[];
     now: Date;
+    extras?: BookingExtras;
   }): BookingDetailDto {
     const { booking } = p;
     const activeHold =
@@ -380,7 +471,13 @@ export class BookingsService {
       passengers: counts,
       flight: toFlightHeader(p.flight),
       seats: p.seats,
-      priceEstimate,
+      priceEstimate: p.extras?.price ? null : priceEstimate,
+      travellers: p.extras?.travellers ?? [],
+      contact: p.extras?.contact ?? { email: null, phone: null },
+      price: p.extras?.price ?? null,
+      payment: p.extras?.payment ?? null,
+      ticket: p.extras?.ticket ?? null,
+      confirmedAt: p.extras?.confirmedAt ?? null,
       createdAt: booking.createdAt.toISOString(),
     };
   }

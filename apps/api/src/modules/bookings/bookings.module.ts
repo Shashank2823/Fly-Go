@@ -5,11 +5,13 @@ import { SeatInventoryModule } from '../seat-inventory/seat-inventory.module';
 import { BookingsController } from './bookings.controller';
 import { BookingsRepository } from './bookings.repository';
 import { BookingsService } from './bookings.service';
+import { CheckoutService } from './checkout.service';
+import { PassengersService } from './passengers.service';
 
 @Module({
   imports: [MarketsModule, SeatInventoryModule, IdempotencyModule],
   controllers: [BookingsController],
-  providers: [BookingsService, BookingsRepository],
+  providers: [BookingsService, BookingsRepository, PassengersService, CheckoutService],
   exports: [BookingsService, BookingsRepository],
 })
 export class BookingsModule {}

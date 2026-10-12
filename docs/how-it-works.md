@@ -2,7 +2,7 @@
 
 > A living guide. Each section has a **plain-language** explanation followed by the
 > **technical** detail and links to the exact code. Updated at the end of every phase.
-> Current state: **end of Phase 4** (search, seat maps, seat holds).
+> Current state: **end of Phase 5** (search, seat maps, seat holds, passengers, checkout, payments).
 
 ---
 
@@ -189,6 +189,18 @@ picks it up.
 |---|---|---|---|
 | `worker-heartbeat` | every 10 s | proves the worker is alive (writes `flygo:worker:heartbeat`) | [`maintenance.processor.ts` line 26–28](../apps/api/src/queues/processors/maintenance.processor.ts#L26) |
 | `expire-holds` | every 30 s | expires unpaid holds older than 10 min and frees their seats **in PostgreSQL** | [`maintenance.processor.ts` line 31](../apps/api/src/queues/processors/maintenance.processor.ts#L31) → [`hold-expiry.service.ts`](../apps/api/src/modules/seat-inventory/hold-expiry.service.ts) |
+| `outbox-relay` | every 1 s | moves committed events (e.g. `PaymentRequested`) from the `outbox_events` table into the right queue | [`outbox-relay.service.ts`](../apps/api/src/modules/outbox/outbox-relay.service.ts), routes in [`outbox-routes.ts`](../apps/api/src/modules/outbox/outbox-routes.ts) |
+| `reconcile-payments` | every 2 min | re-sends payments never submitted and asks the gateway about payments stuck "processing" | [`payment-reconciliation.service.ts`](../apps/api/src/modules/payments/payment-reconciliation.service.ts) |
+
+**`payments` queue** (5 at a time, up to 8 retries with exponential back-off) —
+[`payments.processor.ts`](../apps/api/src/queues/processors/payments.processor.ts):
+
+| Job | What it does |
+|---|---|
+| `submit-payment` | sends the payment to the gateway (idempotency key = payment id, so a retry never charges twice) |
+| `mock-provider-event` | development only: the mock gateway "calling our webhook" ~1.5 s later |
+| `apply-payment-event` | applies a recorded gateway event: confirms the booking on success, returns it to `PENDING` on decline |
+| `refund-payment` | refunds a payment that succeeded for seats the booking no longer owns |
 
 - Queue setup (Redis connection, key prefix `flygo:bull`, retries):
   [`queues.module.ts`](../apps/api/src/queues/queues.module.ts#L15)
@@ -225,6 +237,42 @@ Run a flight search in the browser and a `flygo:cache:flight-search:*` key appea
 30 seconds and it disappears.
 
 ---
+
+## 4.7 Paying for a booking — step by step
+
+**Plain:** pressing *Complete payment* doesn't wait on the card network inside your request.
+FlyGo records "a payment has started", tells you it's processing, and the worker finishes the
+job in the background — exactly how real gateways (Razorpay, Stripe) work, with their answer
+arriving later as a webhook. Your page checks every second and moves on when the answer lands.
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant API
+  participant PG as PostgreSQL
+  participant W as Worker
+  participant G as Mock gateway
+  B->>API: POST /bookings/REF/payments (Idempotency-Key)
+  API->>PG: one transaction: payment INITIATED, booking PAYMENT_PENDING,<br/>seat hold extended to 15 min, outbox PaymentRequested
+  API-->>B: 202 — processing
+  W->>PG: outbox-relay picks up PaymentRequested
+  W->>G: submit-payment (no DB transaction open)
+  G-->>W: ~1.5 s later: "payment.succeeded" (simulated webhook)
+  W->>PG: record event once in payment_events (duplicates ignored)
+  W->>PG: apply: seats BOOKED, booking CONFIRMED, ticket row, outbox BookingConfirmed
+  B->>API: GET …/payments/:id (every second)
+  API-->>B: SUCCEEDED → confirmation page
+```
+
+**Where things are decided:**
+
+| Concern | Rule | Code |
+|---|---|---|
+| Price | Computed on the server at checkout from fares + fee rules + passenger types + seats; the browser only sends `priceVersion` | [`checkout.service.ts`](../apps/api/src/modules/bookings/checkout.service.ts) |
+| Starting payment | Booking must be `PENDING`, hold valid, price unchanged; one in-flight payment per booking (database index) | [`payment-initiation.service.ts`](../apps/api/src/modules/payments/payment-initiation.service.ts) |
+| Duplicate webhooks | Each gateway event is stored once (`UNIQUE provider + event id`); repeats are ignored | [`payment-events.service.ts`](../apps/api/src/modules/payments/payment-events.service.ts) |
+| Confirmation | Only if the booking still owns **all** its seats; otherwise release + refund | [`payment-processing.service.ts`](../apps/api/src/modules/payments/payment-processing.service.ts) |
+| Swapping in a real gateway | Implement `PaymentProvider` and add a webhook endpoint that calls the same ingest method | [`payment-provider.ts`](../apps/api/src/modules/payments/providers/payment-provider.ts) |
 
 ## 5. MongoDB — connected, not used yet
 

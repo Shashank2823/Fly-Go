@@ -24,6 +24,20 @@ export class MaintenanceScheduler implements OnApplicationBootstrap {
       { every: 30_000 },
       { name: MaintenanceJob.ExpireHolds, opts: { attempts: 1, removeOnComplete: true } },
     );
+    // Publishes committed domain events (e.g. PaymentRequested) to their queues.
+    await this.queue.upsertJobScheduler(
+      MaintenanceJob.OutboxRelay,
+      { every: 1_000 },
+      {
+        name: MaintenanceJob.OutboxRelay,
+        opts: { attempts: 1, removeOnComplete: true, removeOnFail: 100 },
+      },
+    );
+    await this.queue.upsertJobScheduler(
+      MaintenanceJob.ReconcilePayments,
+      { every: 120_000 },
+      { name: MaintenanceJob.ReconcilePayments, opts: { attempts: 1, removeOnComplete: true } },
+    );
     this.logger.log('Maintenance job schedulers registered');
   }
 }

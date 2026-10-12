@@ -1,6 +1,6 @@
 import { CheckCircle2, Clock, Lock, TimerOff } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, Navigate, useParams } from 'react-router';
 import { ApiError } from '../api/api-error';
 import { useBooking, useReleaseHold } from '../api/bookings';
 import { Alert } from '../components/ui/Alert';
@@ -47,6 +47,10 @@ export function BookingHoldPage() {
   }
 
   const b = booking.data;
+  if (b.status === 'CONFIRMED' || b.status === 'REFUNDED')
+    return <Navigate to={`/bookings/${b.reference}`} replace />;
+  if (b.status === 'PAYMENT_PENDING')
+    return <Navigate to={`/book/${b.reference}/checkout`} replace />;
   const expired = b.status === 'EXPIRED' || (b.status === 'PENDING' && remaining === 0);
   const released = b.status === 'CANCELLED';
   const active = b.status === 'PENDING' && !expired;
@@ -140,9 +144,8 @@ export function BookingHoldPage() {
               <div>
                 <h2 className="font-bold">Next: passenger details & payment</h2>
                 <p className="mt-1 text-sm text-muted">
-                  Traveller names, checkout and payment arrive in the next build phase. Your hold
-                  works end-to-end today: it counts down, can be released, and expires
-                  automatically.
+                  Add each traveller’s details, review the final price and pay before the timer runs
+                  out.
                 </p>
               </div>
             </Card>
@@ -177,9 +180,12 @@ export function BookingHoldPage() {
           <Card className="space-y-3">
             {active ? (
               <>
-                <Button className="w-full" size="lg" disabled>
+                <Link
+                  to={`/book/${b.reference}/passengers`}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-saffron-600 text-sm font-semibold text-white hover:bg-saffron-700"
+                >
                   <CheckCircle2 className="size-4" aria-hidden /> Continue to passenger details
-                </Button>
+                </Link>
                 {!confirmRelease ? (
                   <Button
                     variant="danger"

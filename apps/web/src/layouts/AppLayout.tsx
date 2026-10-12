@@ -5,7 +5,10 @@ import { UserMenu } from '../features/auth/UserMenu';
 import { cn } from '../lib/cn';
 
 /** Only implemented routes are linked. */
-const NAV = [{ to: '/', label: 'Flights', match: ['/', '/flights'] }];
+const NAV = [
+  { to: '/', label: 'Flights', match: ['/', '/flights'], auth: false },
+  { to: '/bookings', label: 'My trips', match: ['/bookings', '/book/'], auth: true },
+];
 
 const FOOTER_COLUMNS = [
   { title: 'Company', links: ['About us', 'Careers', 'Contact'] },
@@ -38,6 +41,7 @@ function SessionArea() {
 
 export function AppLayout() {
   const { pathname } = useLocation();
+  const { data: user } = useCurrentUser();
   return (
     <div className="flex min-h-screen flex-col">
       <a
@@ -51,7 +55,7 @@ export function AppLayout() {
           <div className="flex items-center gap-8">
             <Logo />
             <nav aria-label="Main" className="hidden gap-1 sm:flex">
-              {NAV.map((item) => (
+              {NAV.filter((item) => !item.auth || user).map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}

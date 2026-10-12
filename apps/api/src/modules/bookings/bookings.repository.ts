@@ -32,6 +32,43 @@ export class BookingsRepository {
     });
   }
 
+  async listForUser(userId: string, page: number, pageSize: number) {
+    const where = { userId };
+    return Promise.all([
+      this.prisma.booking.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: { flight: { include: flightInclude }, heldSeats: { select: { seatLabel: true } } },
+      }),
+      this.prisma.booking.count({ where }),
+    ]);
+  }
+
+  passengersWithSeats(bookingId: string, db: Db = this.prisma) {
+    return db.bookingPassenger.findMany({
+      where: { bookingId },
+      orderBy: { ordinal: 'asc' },
+      include: { seat: { include: { flightSeat: { select: { seatLabel: true, kind: true } } } } },
+    });
+  }
+
+  priceLines(bookingId: string, priceVersion: number, db: Db = this.prisma) {
+    return db.bookingPriceLine.findMany({
+      where: { bookingId, priceVersion },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+  }
+
+  latestPayment(bookingId: string) {
+    return this.prisma.payment.findFirst({ where: { bookingId }, orderBy: { createdAt: 'desc' } });
+  }
+
+  latestTicket(bookingId: string) {
+    return this.prisma.ticket.findFirst({ where: { bookingId }, orderBy: { version: 'desc' } });
+  }
+
   flightForBooking(flightId: string) {
     return this.prisma.flight.findUnique({ where: { id: flightId }, include: flightInclude });
   }

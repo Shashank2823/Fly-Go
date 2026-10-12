@@ -18,4 +18,6 @@ export function applyTestEnv(): void {
   process.env.LOG_LEVEL = 'warn';
   process.env.DATABASE_URL = testUrl.toString();
   process.env.REDIS_DB = '15';
+  process.env.MOCK_PAYMENT_DELAY_MS = '100';
+  process.env.MOCK_PAYMENT_OUTCOME = 'success';
 }
