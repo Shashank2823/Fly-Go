@@ -30,8 +30,17 @@ export class OutboxRelayService {
     private readonly tx: TransactionRunner,
     @InjectQueue(QueueName.Maintenance) maintenance: Queue,
     @InjectQueue(QueueName.Payments) payments: Queue,
+    @InjectQueue(QueueName.Tickets) tickets: Queue,
+    @InjectQueue(QueueName.Email) email: Queue,
+    @InjectQueue(QueueName.Notifications) notifications: Queue,
   ) {
-    this.queues = { [QueueName.Maintenance]: maintenance, [QueueName.Payments]: payments };
+    this.queues = {
+      [QueueName.Maintenance]: maintenance,
+      [QueueName.Payments]: payments,
+      [QueueName.Tickets]: tickets,
+      [QueueName.Email]: email,
+      [QueueName.Notifications]: notifications,
+    };
   }
 
   async relayPending(): Promise<number> {
@@ -49,7 +58,7 @@ export class OutboxRelayService {
           for (const route of OUTBOX_ROUTES[e.event_type] ?? []) {
             await this.queues[route.queue].add(
               route.job,
-              { ...e.payload, eventId: e.id, correlationId: e.correlation_id },
+              { ...e.payload, ...route.data, eventId: e.id, correlationId: e.correlation_id },
               { jobId: `${e.id}-${route.job}` },
             );
           }

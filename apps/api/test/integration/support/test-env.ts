@@ -1,4 +1,6 @@
 import { existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { resolve } from 'node:path';
 
 /**
@@ -20,4 +22,6 @@ export function applyTestEnv(): void {
   process.env.REDIS_DB = '15';
   process.env.MOCK_PAYMENT_DELAY_MS = '100';
   process.env.MOCK_PAYMENT_OUTCOME = 'success';
+  process.env.MONGODB_DB = 'flygo_test';
+  process.env.TICKET_STORAGE_DIR = join(tmpdir(), 'flygo-test-tickets');
 }

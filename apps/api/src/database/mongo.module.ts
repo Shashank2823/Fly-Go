@@ -1,6 +1,7 @@
 import { Global, Inject, Logger, Module, type OnApplicationShutdown } from '@nestjs/common';
 import { type Db, MongoClient } from 'mongodb';
 import { AppConfig } from '../config/app-config';
+import { MongoIndexesService } from './mongo/mongo-indexes.service';
 import { MONGO_CLIENT, MONGO_DB } from './mongo.tokens';
 
 /**
@@ -10,6 +11,7 @@ import { MONGO_CLIENT, MONGO_DB } from './mongo.tokens';
 @Global()
 @Module({
   providers: [
+    MongoIndexesService,
     {
       provide: MONGO_CLIENT,
       inject: [AppConfig],

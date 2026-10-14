@@ -131,14 +131,25 @@ export function useCreateHold() {
 
 export function useBooking(
   reference: string | undefined,
-  opts: { pollWhilePaying?: boolean } = {},
+  opts: { pollWhilePaying?: boolean; pollForTicket?: boolean } = {},
 ) {
   return useQuery({
     queryKey: bookingKey(reference ?? ''),
     enabled: !!reference,
     queryFn: () => apiRequest<BookingDetail>(`/bookings/${reference}`),
-    refetchInterval: (q) =>
-      opts.pollWhilePaying && q.state.data?.status === 'PAYMENT_PENDING' ? 1_500 : false,
+    refetchInterval: (q) => {
+      const b = q.state.data;
+      if (opts.pollWhilePaying && b?.status === 'PAYMENT_PENDING') return 1_500;
+      // The e-ticket is generated in the background right after confirmation.
+      if (
+        opts.pollForTicket &&
+        b?.status === 'CONFIRMED' &&
+        b.ticket &&
+        b.ticket.status !== 'ISSUED'
+      )
+        return 2_000;
+      return false;
+    },
     // Keep checking even if the traveller switches tabs mid-payment (stops once settled).
     refetchIntervalInBackground: true,
   });

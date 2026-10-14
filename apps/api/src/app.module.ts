@@ -15,6 +15,9 @@ import { FlightsModule } from './modules/flights/flights.module';
 import { HealthModule } from './modules/health/health.module';
 import { OutboxModule } from './modules/outbox/outbox.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { TicketsModule } from './modules/tickets/tickets.module';
+import { StorageModule } from './infrastructure/storage/storage.module';
 import { ReferenceModule } from './modules/reference/reference.module';
 import { SeatInventoryModule } from './modules/seat-inventory/seat-inventory.module';
 import { QueuesModule } from './queues/queues.module';
@@ -38,6 +41,9 @@ import { QueuesModule } from './queues/queues.module';
     SeatInventoryModule,
     BookingsModule,
     PaymentsModule,
+    StorageModule,
+    TicketsModule,
+    NotificationsModule,
     HealthModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: ProblemDetailsFilter }],

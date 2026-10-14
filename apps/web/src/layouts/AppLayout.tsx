@@ -2,6 +2,7 @@ import { Link, NavLink, Outlet, ScrollRestoration, useLocation } from 'react-rou
 import { useCurrentUser } from '../api/auth';
 import { Logo } from '../components/Logo';
 import { UserMenu } from '../features/auth/UserMenu';
+import { NotificationBell } from '../features/notifications/NotificationBell';
 import { cn } from '../lib/cn';
 
 /** Only implemented routes are linked. */
@@ -20,7 +21,13 @@ function SessionArea() {
   const { data: user, isPending } = useCurrentUser();
   if (isPending)
     return <span className="size-9 animate-pulse rounded-full bg-navy-50" aria-hidden />;
-  if (user) return <UserMenu user={user} />;
+  if (user)
+    return (
+      <div className="flex items-center gap-1">
+        <NotificationBell />
+        <UserMenu user={user} />
+      </div>
+    );
   return (
     <div className="flex items-center gap-1.5">
       <Link

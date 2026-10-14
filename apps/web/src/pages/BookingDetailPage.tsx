@@ -1,4 +1,4 @@
-import { CheckCircle2, Download, Eye, FileClock, Loader2, Plane, TimerOff } from 'lucide-react';
+import { CheckCircle2, Download, Eye, FileCheck2, Loader2, Plane, TimerOff } from 'lucide-react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { ApiError } from '../api/api-error';
 import { type BookingDetail, useBooking } from '../api/bookings';
@@ -20,6 +20,58 @@ import {
 } from '../lib/format';
 
 const dateTime = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+
+/** View/download once the PDF is issued; a friendly waiting state until then. */
+function TicketActions({ b }: { b: BookingDetail }) {
+  const ready = b.ticket?.status === 'ISSUED';
+  const failing = b.ticket?.status === 'FAILED';
+  const base = `/api/v1/bookings/${b.reference}/ticket`;
+  const btn =
+    'flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-colors';
+  return (
+    <Card className="space-y-3">
+      <h2 className="font-bold">Your e-ticket</h2>
+      {ready ? (
+        <>
+          <p className="flex items-start gap-2 text-sm text-muted">
+            <FileCheck2 className="mt-0.5 size-4 shrink-0 text-teal-700" aria-hidden />
+            Ready. Show it (or its QR code) at check-in.
+          </p>
+          <a
+            href={base}
+            target="_blank"
+            rel="noopener"
+            className={`${btn} bg-navy-900 text-white hover:bg-navy-800`}
+          >
+            <Eye className="size-4" aria-hidden /> View ticket
+          </a>
+          <a
+            href={`${base}/download`}
+            download
+            className={`${btn} border border-line bg-surface text-ink hover:border-navy-200 hover:bg-navy-50`}
+          >
+            <Download className="size-4" aria-hidden /> Download PDF
+          </a>
+        </>
+      ) : (
+        <>
+          <p role="status" className="flex items-start gap-2 text-sm text-muted">
+            <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" aria-hidden />
+            {failing
+              ? 'This is taking longer than usual — we’re retrying automatically. Check back shortly.'
+              : 'Preparing your PDF e-ticket… this usually takes a few seconds.'}
+          </p>
+          <Button variant="secondary" className="w-full" disabled>
+            <Eye className="size-4" aria-hidden /> View ticket
+          </Button>
+          <Button variant="outline" className="w-full" disabled>
+            <Download className="size-4" aria-hidden /> Download PDF
+          </Button>
+        </>
+      )}
+    </Card>
+  );
+}
 
 function TicketCard({ b }: { b: BookingDetail }) {
   const f = b.flight;
@@ -118,7 +170,7 @@ export function BookingDetailPage() {
   const { reference = '' } = useParams();
   const ref = reference.toUpperCase();
   const [params] = useSearchParams();
-  const booking = useBooking(ref, { pollWhilePaying: true });
+  const booking = useBooking(ref, { pollWhilePaying: true, pollForTicket: true });
 
   if (booking.isPending) {
     return (
@@ -155,8 +207,8 @@ export function BookingDetailPage() {
             <div>
               <h1 className="text-2xl font-extrabold">Booking confirmed!</h1>
               <p className="text-sm text-muted">
-                Your trip to {b.flight.destination.city} is booked. A confirmation goes to{' '}
-                {b.contact.email}.
+                Your trip to {b.flight.destination.city} is booked. A confirmation email is on its
+                way to {b.contact.email}.
               </p>
             </div>
           </div>
@@ -179,20 +231,7 @@ export function BookingDetailPage() {
         <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
           <TicketCard b={b} />
           <aside className="space-y-4">
-            <Card className="space-y-3">
-              <h2 className="font-bold">Your e-ticket</h2>
-              <p className="flex items-start gap-2 text-sm text-muted">
-                <FileClock className="mt-0.5 size-4 shrink-0" aria-hidden />
-                Your PDF e-ticket is being prepared. Viewing and downloading it arrives in the next
-                build phase.
-              </p>
-              <Button variant="secondary" className="w-full" disabled>
-                <Eye className="size-4" aria-hidden /> View ticket
-              </Button>
-              <Button variant="outline" className="w-full" disabled>
-                <Download className="size-4" aria-hidden /> Download PDF
-              </Button>
-            </Card>
+            <TicketActions b={b} />
             {b.price && (
               <Card>
                 <h2 className="mb-4 font-bold">Fare breakdown</h2>

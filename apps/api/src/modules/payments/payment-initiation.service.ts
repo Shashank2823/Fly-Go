@@ -170,14 +170,40 @@ export class PaymentInitiationService {
     reference: string,
     paymentId: string,
   ): Promise<PaymentStatusDto> {
-    const booking = await this.bookings.findByReference(reference, user.id);
-    if (!booking) throw notFound();
-    const payment = await this.prisma.payment.findFirst({
-      where: { id: paymentId, bookingId: booking.id },
-    });
-    if (!payment)
+    // One statement → one consistent snapshot. Two separate reads could straddle the confirm
+    // transaction and report "payment SUCCEEDED" with a stale "booking PAYMENT_PENDING".
+    const rows = await this.prisma.$queryRaw<
+      {
+        id: string;
+        status: PaymentStatusDto['status'];
+        amount_minor: bigint;
+        currency: string;
+        failure_code: string | null;
+        updated_at: Date;
+        booking_status: PaymentStatusDto['bookingStatus'];
+      }[]
+    >`
+      SELECT p.id, p.status, p.amount_minor, p.currency, p.failure_code, p.updated_at, b.status AS booking_status
+      FROM payments p
+      JOIN bookings b ON b.id = p.booking_id
+      WHERE p.id = ${paymentId}::uuid AND b.reference = ${reference} AND b.user_id = ${user.id}::uuid`;
+    const row = rows[0];
+    if (!row) {
+      const booking = await this.bookings.findByReference(reference, user.id);
+      if (!booking) throw notFound();
       throw new AppError('PAYMENT_NOT_FOUND', HttpStatus.NOT_FOUND, 'Payment not found');
-    return this.toDto(payment, booking.status);
+    }
+    return this.toDto(
+      {
+        id: row.id,
+        status: row.status,
+        amountMinor: row.amount_minor,
+        currency: row.currency,
+        failureCode: row.failure_code,
+        updatedAt: row.updated_at,
+      },
+      row.booking_status,
+    );
   }
 
   private toDto(

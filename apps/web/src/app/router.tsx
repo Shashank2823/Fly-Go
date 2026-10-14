@@ -9,6 +9,7 @@ import { HomePage } from '../pages/HomePage';
 import { LoginPage } from '../pages/LoginPage';
 import { MyBookingsPage } from '../pages/MyBookingsPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
+import { NotificationsPage } from '../pages/NotificationsPage';
 import { PassengersPage } from '../pages/PassengersPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { RegisterPage } from '../pages/RegisterPage';
@@ -58,6 +59,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <BookingDetailPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: 'notifications',
+        element: (
+          <RequireAuth>
+            <NotificationsPage />
           </RequireAuth>
         ),
       },

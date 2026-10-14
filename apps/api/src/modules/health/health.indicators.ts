@@ -27,6 +27,9 @@ export class HealthIndicators {
     @Inject(MONGO_DB) private readonly mongo: Db,
     @InjectQueue(QueueName.Maintenance) private readonly maintenanceQueue: Queue,
     @InjectQueue(QueueName.Payments) private readonly paymentsQueue: Queue,
+    @InjectQueue(QueueName.Tickets) private readonly ticketsQueue: Queue,
+    @InjectQueue(QueueName.Email) private readonly emailQueue: Queue,
+    @InjectQueue(QueueName.Notifications) private readonly notificationsQueue: Queue,
     private readonly config: AppConfig,
   ) {}
 
@@ -86,18 +89,27 @@ export class HealthIndicators {
     const check = this.health.check('queues');
     try {
       const states = ['waiting', 'active', 'delayed', 'failed'] as const;
-      const [maintenance, payments] = await Promise.all([
-        this.maintenanceQueue.getJobCounts(...states),
-        this.paymentsQueue.getJobCounts(...states),
-      ]);
+      const queues = {
+        [QueueName.Maintenance]: this.maintenanceQueue,
+        [QueueName.Payments]: this.paymentsQueue,
+        [QueueName.Tickets]: this.ticketsQueue,
+        [QueueName.Email]: this.emailQueue,
+        [QueueName.Notifications]: this.notificationsQueue,
+      };
+      const counts = Object.fromEntries(
+        await Promise.all(
+          Object.entries(queues).map(
+            async ([name, q]) => [name, await q.getJobCounts(...states)] as const,
+          ),
+        ),
+      );
       const outbox = await this.prisma.outboxEvent.groupBy({
         by: ['status'],
         _count: true,
         where: { status: { in: ['PENDING', 'DEAD'] } },
       });
       return check.up({
-        [QueueName.Maintenance]: maintenance,
-        [QueueName.Payments]: payments,
+        ...counts,
         outbox: Object.fromEntries(outbox.map((o) => [o.status, o._count])),
       });
     } catch (err) {

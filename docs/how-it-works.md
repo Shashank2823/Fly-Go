@@ -2,7 +2,7 @@
 
 > A living guide. Each section has a **plain-language** explanation followed by the
 > **technical** detail and links to the exact code. Updated at the end of every phase.
-> Current state: **end of Phase 5** (search, seat maps, seat holds, passengers, checkout, payments).
+> Current state: **end of Phase 6** (search, seats, booking, payments, e-tickets, emails, notifications).
 
 ---
 
@@ -14,7 +14,7 @@
 |---|---|---|
 | **PostgreSQL** | The official ledger. If it's not here, it didn't happen. | Users, airports, flights, fares, every seat, bookings, payments, audit trail |
 | **Redis** | A whiteboard next to the ledger: fast, temporary, wiped without harm. | Short-lived caches, login sessions, rate-limit counters, background job queues |
-| **MongoDB** | A filing cabinet for documents (not used by any page yet). | From Phase 6: ticket snapshots, email delivery history, in-app notifications |
+| **MongoDB** | A filing cabinet for documents. | Ticket snapshots, email delivery history, in-app notifications |
 
 The golden rule: **prices, seat availability and bookings are always decided by PostgreSQL**.
 Redis may *speed up showing* information, but it never decides anything.
@@ -202,6 +202,11 @@ picks it up.
 | `apply-payment-event` | applies a recorded gateway event: confirms the booking on success, returns it to `PENDING` on decline |
 | `refund-payment` | refunds a payment that succeeded for seats the booking no longer owns |
 
+**`tickets`** (4 at a time, 6 retries) · **`email`** (5 at a time, 8 retries, back-off from 10 s) ·
+**`notifications`** (10 at a time, 5 retries) — processors in
+[`apps/api/src/queues/processors/`](../apps/api/src/queues/processors/); what triggers each is in
+[`outbox-routes.ts`](../apps/api/src/modules/outbox/outbox-routes.ts).
+
 - Queue setup (Redis connection, key prefix `flygo:bull`, retries):
   [`queues.module.ts`](../apps/api/src/queues/queues.module.ts#L15)
 - Timers are registered by [`maintenance.scheduler.ts`](../apps/api/src/queues/schedulers/maintenance.scheduler.ts#L17)
@@ -274,18 +279,45 @@ sequenceDiagram
 | Confirmation | Only if the booking still owns **all** its seats; otherwise release + refund | [`payment-processing.service.ts`](../apps/api/src/modules/payments/payment-processing.service.ts) |
 | Swapping in a real gateway | Implement `PaymentProvider` and add a webhook endpoint that calls the same ingest method | [`payment-provider.ts`](../apps/api/src/modules/payments/providers/payment-provider.ts) |
 
-## 5. MongoDB — connected, not used yet
+## 5. MongoDB — documents that aren't transactional
 
-**Plain:** MongoDB is ready and running, but no page reads or writes it yet. From Phase 6 it
-will store documents that don't need strict relational rules: a frozen copy of each ticket as
-printed, the history of every email sent, and your in-app notifications.
+**Plain:** MongoDB keeps three kinds of documents that don't need PostgreSQL's strict rules.
+It is only ever written by the **worker**, after PostgreSQL has committed the real change, and
+every write is "insert once" — so a retried job can never create a duplicate.
 
-**Technically:** the client connects at start-up in
-[`mongo.module.ts`](../apps/api/src/database/mongo.module.ts#L17) and readiness pings it in
-[`health.indicators.ts`](../apps/api/src/modules/health/health.indicators.ts#L51). Nothing else
-touches it yet.
+| Collection | What it holds | Written when | Unique key | Code |
+|---|---|---|---|---|
+| `ticket_snapshots` | a frozen copy of exactly what was printed on an e-ticket | the ticket PDF is generated | `bookingId + version` | [`ticket-snapshots.repository.ts`](../apps/api/src/modules/tickets/ticket-snapshots.repository.ts) |
+| `email_messages` | each confirmation email and every send attempt (`QUEUED → SENDING → SENT / RETRY_SCHEDULED / FAILED`) | the email job runs | `dedupeKey` (`booking:REF:confirmation:v1`) | [`email-messages.repository.ts`](../apps/api/src/modules/email/email-messages.repository.ts) |
+| `notifications` | the bell's notifications and their read state (auto-deleted after 180 days) | a domain event is processed | `dedupeKey` (`TYPE:eventId`) | [`notifications.repository.ts`](../apps/api/src/modules/notifications/notifications.repository.ts) |
 
----
+Indexes (including the uniques above) are created at start-up by
+[`mongo-indexes.service.ts`](../apps/api/src/database/mongo/mongo-indexes.service.ts).
+**PostgreSQL stays the source of truth:** the `tickets` table says whether a ticket is issued;
+the snapshot only records *what* was printed. If MongoDB is down, jobs retry — bookings are unaffected.
+
+### 5.1 After a booking is confirmed
+
+```mermaid
+flowchart LR
+  C["BookingConfirmed<br/>(outbox, PostgreSQL)"] --> R[outbox-relay]
+  R --> T["tickets: generate-ticket"]
+  R --> E["email: send-booking-confirmation"]
+  R --> N["notifications: BOOKING_CONFIRMED"]
+  T --> S[("snapshot → MongoDB")] --> P["PDF (PDFKit, deterministic)"] --> F[("file → var/tickets")]
+  P --> I["ticket ISSUED + TicketIssued event"] --> N2["notifications: TICKET_READY"]
+  E --> M[("email_messages → MongoDB")] --> SMTP["Mailpit (SMTP)"]
+```
+
+- The three branches are **separate jobs** — an email failure never delays the ticket, and vice versa.
+- The PDF is **deterministic**: the same snapshot always produces identical bytes (checksum stored
+  in PostgreSQL). If the file is ever lost, it is rebuilt from the snapshot on the next download.
+- Tickets are served only through the API with the owner's session (`private, no-store`); the
+  file path is never exposed — [`tickets.controller.ts`](../apps/api/src/modules/tickets/tickets.controller.ts).
+- **Safety nets** (maintenance queue): `reconcile-tickets` (every 5 min) and `retry-failed-emails`
+  (every 10 min) re-queue any confirmed booking without an issued ticket or a sent email —
+  [`delivery-reconciliation.service.ts`](../apps/api/src/queues/reconciliation/delivery-reconciliation.service.ts).
+- "SENT" means the SMTP server accepted the email, not that it reached the inbox.
 
 ## 6. One search, end to end
 

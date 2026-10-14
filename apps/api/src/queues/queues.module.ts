@@ -35,6 +35,33 @@ import { QUEUE_PREFIX, QueueName } from './queue-names';
           removeOnFail: { age: 30 * 24 * 3600 },
         },
       },
+      {
+        name: QueueName.Tickets,
+        defaultJobOptions: {
+          attempts: 6,
+          backoff: { type: 'exponential', delay: 5_000 },
+          removeOnComplete: { age: 24 * 3600, count: 2_000 },
+          removeOnFail: { age: 7 * 24 * 3600 },
+        },
+      },
+      {
+        name: QueueName.Email,
+        defaultJobOptions: {
+          attempts: 8,
+          backoff: { type: 'exponential', delay: 10_000 },
+          removeOnComplete: { age: 24 * 3600, count: 2_000 },
+          removeOnFail: { age: 7 * 24 * 3600 },
+        },
+      },
+      {
+        name: QueueName.Notifications,
+        defaultJobOptions: {
+          attempts: 5,
+          backoff: { type: 'exponential', delay: 2_000 },
+          removeOnComplete: { age: 24 * 3600, count: 2_000 },
+          removeOnFail: { age: 7 * 24 * 3600 },
+        },
+      },
     ),
   ],
   exports: [BullModule],

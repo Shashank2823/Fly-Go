@@ -4,7 +4,7 @@ A production-oriented flight booking platform: NestJS modular monolith + separat
 
 - Design: [docs/phase-1-system-design.md](docs/phase-1-system-design.md)
 - How it works (PostgreSQL vs Redis vs MongoDB, caching, where the code lives): [docs/how-it-works.md](docs/how-it-works.md)
-- Status: **Phase 5 (passenger details, checkout, queue-driven mock payments, booking confirmation, My trips) complete.** Flights are sample data, not live airline inventory.
+- Status: **Phase 6 (PDF e-tickets, confirmation emails, in-app notifications) complete.** Flights are sample data, not live airline inventory.
 
 ## Layout
 
@@ -29,7 +29,7 @@ npm install
 npm run env:init          # creates .env with random local secrets (never committed)
 docker compose -f ~/Desktop/empire_go/database/docker-compose.yml up -d   # existing PostgreSQL
 npm run infra:up          # Redis, MongoDB, Mailpit — waits until healthy
-npm run db:bootstrap      # creates flygo role + databases (idempotent)
+npm run db:bootstrap      # creates flygo role + databases, grants Mongo test-db access (idempotent)
 npm run db:migrate        # applies Prisma migrations
 npm run db:seed           # roles, INR market, airports, airlines, aircraft, ~3 weeks of flights + seats (idempotent, ~25 s)
 ```
@@ -61,6 +61,8 @@ npm run dev:web           # http://localhost:5173 (proxies /api to :3000)
 | `GET /bookings`, `POST /bookings` (requires `Idempotency-Key`), `GET /bookings/:reference`, `DELETE /bookings/:reference` | signed in, own bookings only |
 | `PUT /bookings/:reference/passengers`, `POST /bookings/:reference/checkout` | signed in, own bookings only |
 | `POST /bookings/:reference/payments` (requires `Idempotency-Key`, returns 202), `GET /bookings/:reference/payments/:paymentId` | signed in, own bookings only |
+| `GET /bookings/:reference/ticket` (inline PDF), `GET /bookings/:reference/ticket/download` | signed in, own bookings only |
+| `GET /notifications`, `PATCH /notifications/:id/read`, `POST /notifications/read-all` | signed in, own notifications only |
 | `GET /health/live`, `GET /health/ready` | public |
 | `GET /health/workers` | `queue:inspect` permission (admins) |
 
@@ -68,6 +70,11 @@ npm run dev:web           # http://localhost:5173 (proxies /api to :3000)
 asynchronous: `POST …/payments` returns 202, and the **worker** submits it to the (mock) gateway,
 receives the simulated webhook and confirms the booking. **Run `npm run dev:worker` alongside the
 API** — without it payments stay "processing" and abandoned holds are not expired.
+
+After confirmation the worker also generates the PDF e-ticket (stored under `var/tickets/`, snapshot
+in MongoDB), sends the confirmation email (open **Mailpit at http://localhost:8025** to read it) and
+creates in-app notifications (the bell in the header). Safety-net jobs re-drive any ticket or email
+that didn't complete.
 
 The mock gateway always succeeds. To try the decline path, start the worker with
 `MOCK_PAYMENT_OUTCOME=fail npm run dev:worker`.

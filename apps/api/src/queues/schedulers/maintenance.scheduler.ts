@@ -38,6 +38,16 @@ export class MaintenanceScheduler implements OnApplicationBootstrap {
       { every: 120_000 },
       { name: MaintenanceJob.ReconcilePayments, opts: { attempts: 1, removeOnComplete: true } },
     );
+    await this.queue.upsertJobScheduler(
+      MaintenanceJob.ReconcileTickets,
+      { every: 5 * 60_000 },
+      { name: MaintenanceJob.ReconcileTickets, opts: { attempts: 1, removeOnComplete: true } },
+    );
+    await this.queue.upsertJobScheduler(
+      MaintenanceJob.RetryEmails,
+      { every: 10 * 60_000 },
+      { name: MaintenanceJob.RetryEmails, opts: { attempts: 1, removeOnComplete: true } },
+    );
     this.logger.log('Maintenance job schedulers registered');
   }
 }

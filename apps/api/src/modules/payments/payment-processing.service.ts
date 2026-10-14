@@ -298,11 +298,20 @@ export class PaymentProcessingService {
         },
         tx,
       );
+      const booking = await tx.booking.findUniqueOrThrow({
+        where: { id: payment.bookingId },
+        select: { reference: true, userId: true },
+      });
       await this.outbox.add(tx, {
         aggregateType: 'payment',
         aggregateId: paymentId,
         eventType: 'PaymentRefunded',
-        payload: { paymentId, bookingId: payment.bookingId },
+        payload: {
+          paymentId,
+          bookingId: payment.bookingId,
+          reference: booking.reference,
+          userId: booking.userId,
+        },
       });
     });
   }

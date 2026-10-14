@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import type { INestApplicationContext } from '@nestjs/common';
 import { WorkerModule } from '../../src/worker.module';
 import { readyToPay } from './support/booking-flow';
+import { mailpitSearch, resetMongo } from './support/delivery';
 import { createFlightFixture, type FlightFixture, resetDatabase } from './support/fixtures';
 import { createTestApp, flushTestRedis, type TestContext } from './support/test-app';
 import { signedInAgent } from './support/users';
@@ -9,7 +10,8 @@ import { signedInAgent } from './support/users';
 /**
  * End-to-end through the real infrastructure: API → outbox → relay (BullMQ job scheduler) →
  * payments queue → mock gateway → simulated webhook (delayed job) → event inbox → apply →
- * booking CONFIRMED. A real worker runs in-process against Redis DB 15.
+ * booking CONFIRMED → ticket PDF + confirmation email + notifications.
+ * A real worker runs in-process against Redis DB 15, MongoDB flygo_test and Mailpit.
  */
 describe('Payment pipeline (API + worker + queues)', () => {
   let ctx: TestContext;
@@ -20,6 +22,7 @@ describe('Payment pipeline (API + worker + queues)', () => {
     ctx = await createTestApp();
     await resetDatabase(ctx.prisma);
     await flushTestRedis(ctx.redis);
+    await resetMongo(ctx.app);
     worker = await NestFactory.createApplicationContext(WorkerModule, { logger: ['error'] });
     await worker.init();
   }, 30_000);
@@ -75,6 +78,28 @@ describe('Payment pipeline (API + worker + queues)', () => {
       status: 'APPLIED',
       type: 'payment.succeeded',
     });
+    // Delivery fans out from BookingConfirmed through separate queues.
+    const withTicket = await waitFor(
+      async () =>
+        (await a.agent.get(`/api/v1/bookings/${reference}`)).body as { ticket: { status: string } },
+      (b) => b.ticket?.status === 'ISSUED',
+    );
+    expect(withTicket.ticket.status).toBe('ISSUED');
+    const pdf = await a.agent.get(`/api/v1/bookings/${reference}/ticket/download`).expect(200);
+    expect(pdf.headers['content-type']).toBe('application/pdf');
+
+    const notes = await waitFor(
+      async () => (await a.agent.get('/api/v1/notifications')).body as { data: { type: string }[] },
+      (n) => n.data.length >= 2,
+    );
+    expect(notes.data.map((n) => n.type).sort()).toEqual(['BOOKING_CONFIRMED', 'TICKET_READY']);
+
+    const mail = await waitFor(
+      () => mailpitSearch(reference),
+      (m) => m.messages_count >= 1,
+    );
+    expect(mail.messages_count).toBe(1);
+
     const audit = await ctx.prisma.auditLog.findMany({
       where: { action: { in: ['PAYMENT_INITIATED', 'PAYMENT_SUBMITTED', 'BOOKING_CONFIRMED'] } },
     });

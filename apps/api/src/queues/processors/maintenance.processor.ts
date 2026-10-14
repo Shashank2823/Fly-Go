@@ -6,6 +6,7 @@ import { REDIS_CLIENT } from '../../infrastructure/redis/redis.module';
 import { OutboxRelayService } from '../../modules/outbox/outbox-relay.service';
 import { PaymentReconciliationService } from '../../modules/payments/payment-reconciliation.service';
 import { HoldExpiryService } from '../../modules/seat-inventory/hold-expiry.service';
+import { DeliveryReconciliationService } from '../reconciliation/delivery-reconciliation.service';
 import { MaintenanceJob, QueueName, WORKER_HEARTBEAT_KEY } from '../queue-names';
 
 /**
@@ -21,6 +22,7 @@ export class MaintenanceProcessor extends WorkerHost {
     private readonly holdExpiry: HoldExpiryService,
     private readonly outboxRelay: OutboxRelayService,
     private readonly reconciliation: PaymentReconciliationService,
+    private readonly delivery: DeliveryReconciliationService,
   ) {
     super();
   }
@@ -43,6 +45,12 @@ export class MaintenanceProcessor extends WorkerHost {
         return;
       case MaintenanceJob.ReconcilePayments:
         await this.reconciliation.reconcile();
+        return;
+      case MaintenanceJob.ReconcileTickets:
+        await this.delivery.reconcileTickets();
+        return;
+      case MaintenanceJob.RetryEmails:
+        await this.delivery.retryEmails();
         return;
       default:
         throw new UnrecoverableError(`Unknown maintenance job: ${job.name}`);

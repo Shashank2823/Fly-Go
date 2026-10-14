@@ -5,6 +5,9 @@
 export const QueueName = {
   Maintenance: 'maintenance',
   Payments: 'payments',
+  Tickets: 'tickets',
+  Email: 'email',
+  Notifications: 'notifications',
 } as const;
 export type QueueName = (typeof QueueName)[keyof typeof QueueName];
 
@@ -13,6 +16,8 @@ export const MaintenanceJob = {
   ExpireHolds: 'expire-holds',
   OutboxRelay: 'outbox-relay',
   ReconcilePayments: 'reconcile-payments',
+  ReconcileTickets: 'reconcile-tickets',
+  RetryEmails: 'retry-failed-emails',
 } as const;
 export type MaintenanceJob = (typeof MaintenanceJob)[keyof typeof MaintenanceJob];
 
@@ -27,6 +32,10 @@ export const PaymentsJob = {
   MockProviderEvent: 'mock-provider-event',
 } as const;
 export type PaymentsJob = (typeof PaymentsJob)[keyof typeof PaymentsJob];
+
+export const TicketsJob = { GenerateTicket: 'generate-ticket' } as const;
+export const EmailJob = { SendBookingConfirmation: 'send-booking-confirmation' } as const;
+export const NotificationsJob = { CreateNotification: 'create-notification' } as const;
 
 /** BullMQ key prefix — keeps FlyGo keys separate from cache/session keys in Redis. */
 export const QUEUE_PREFIX = 'flygo:bull';
