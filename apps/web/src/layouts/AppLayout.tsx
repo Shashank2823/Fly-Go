@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet, ScrollRestoration, useLocation } from 'react-router';
 import { useCurrentUser } from '../api/auth';
+import { useRouteTitle } from '../app/route-title';
 import { Logo } from '../components/Logo';
 import { UserMenu } from '../features/auth/UserMenu';
 import { NotificationBell } from '../features/notifications/NotificationBell';
@@ -49,6 +50,7 @@ function SessionArea() {
 export function AppLayout() {
   const { pathname } = useLocation();
   const { data: user } = useCurrentUser();
+  useRouteTitle();
   return (
     <div className="flex min-h-screen flex-col">
       <a

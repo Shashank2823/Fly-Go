@@ -38,7 +38,7 @@ export class PaymentProcessingService {
     const payment = await this.tx.run((tx) =>
       tx.payment.findUnique({
         where: { id: paymentId },
-        include: { booking: { select: { reference: true } } },
+        include: { booking: { select: { reference: true, contactEmail: true } } },
       }),
     );
     if (
@@ -54,6 +54,7 @@ export class PaymentProcessingService {
       amountMinor: payment.amountMinor,
       currency: payment.currency,
       bookingReference: payment.booking.reference,
+      customerEmail: payment.booking.contactEmail,
       idempotencyKey: paymentId,
     });
 

@@ -1,7 +1,7 @@
 {
   "name": "flygo",
   "private": true,
-  "description": "FlyGo — production-oriented flight booking platform (modular monolith)",
+  "description": "FlyGo \u2014 production-oriented flight booking platform (modular monolith)",
   "workspaces": [
     "apps/*"
   ],
@@ -20,13 +20,14 @@
     "dev:api": "npm run start:dev -w @flygo/api",
     "dev:worker": "npm run worker:dev -w @flygo/api",
     "dev:web": "npm run dev -w @flygo/web",
-    "build": "npm run build --workspaces",
-    "lint": "npm run lint --workspaces",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces",
-    "test": "npm run test --workspaces",
+    "test": "npm run test --workspaces --if-present",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test:int": "npm run test:int -w @flygo/api"
+    "test:int": "npm run test:int -w @flygo/api",
+    "test:e2e": "npm run e2e -w @flygo/e2e"
   },
   "devDependencies": {
     "prettier": "3.9.10"

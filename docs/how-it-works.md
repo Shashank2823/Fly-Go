@@ -2,7 +2,8 @@
 
 > A living guide. Each section has a **plain-language** explanation followed by the
 > **technical** detail and links to the exact code. Updated at the end of every phase.
-> Current state: **end of Phase 6** (search, seats, booking, payments, e-tickets, emails, notifications).
+> Current state: **end of Phase 7** (search, seats, booking, payments, e-tickets, emails,
+> notifications, plus the automated test layers described in §7).
 
 ---
 
@@ -333,3 +334,41 @@ flowchart LR
 
 Clicking **Select seats** then calls the seat-map endpoint, which always reads **PostgreSQL**
 directly — no cache — because that screen is about to make a real decision.
+
+## 7. How FlyGo is tested
+
+**In plain words.** There are three layers of automated checks, from small to large:
+
+1. **Unit tests** check single pieces in isolation — e.g. "₹4,500 + 7.5% GST rounds to the right
+   paisa", or "a 1:30 AM time that doesn't exist on a DST day is shifted forward".
+2. **Integration tests** start the real API in memory and talk to real PostgreSQL, Redis and
+   MongoDB — e.g. "50 people grab the same seat at once and exactly one gets it", or "someone
+   else's booking reference returns *not found*".
+3. **End-to-end tests** open a real (invisible) Chrome browser and use FlyGo like a person would:
+   sign up, search, pick a seat, pay, download the ticket, check the email in Mailpit.
+
+None of them ever touch your own data: each layer has its own databases.
+
+**Technical detail.**
+
+| Layer | Command | Runs against | Code |
+|---|---|---|---|
+| Unit | `npm test` | nothing external | `apps/api/src/**/*.spec.ts`, `apps/web/src/**/*.test.ts` |
+| Integration | `npm run test:int` | PostgreSQL `flygo_test` (truncated per test), Redis DB 15, Mongo `flygo_test`, Mailpit | [`apps/api/test/integration`](../apps/api/test/integration) |
+| End-to-end | `npm run test:e2e` | PostgreSQL `flygo_e2e` (seeded once, cleaned per run), Redis DB 14, Mongo `flygo_e2e`, Mailpit | [`apps/e2e`](../apps/e2e) |
+
+- **Access-control matrix** —
+  [`access-control.int-spec.ts`](../apps/api/test/integration/access-control.int-spec.ts) calls every
+  signed-in endpoint as a guest (401), as another customer (404) and without a CSRF token (403).
+  Ownership is enforced in the query itself (`WHERE reference = … AND user_id = …`), so a foreign
+  booking is indistinguishable from a missing one.
+- **E2E servers** — [`playwright.config.ts`](../apps/e2e/playwright.config.ts) starts the built API
+  (:3100), the worker and the Vite dev server (:5180), with env from
+  [`support/env.ts`](../apps/e2e/support/env.ts). [`global-setup.ts`](../apps/e2e/support/global-setup.ts)
+  migrates/seeds `flygo_e2e` and removes the previous run's customers and bookings (releasing
+  seats first — a `TRUNCATE … CASCADE` would also wipe the seat inventory).
+- **Edge cases without waiting** — hold expiry moves `hold_expires_at` into the past in the
+  database ([`support/db.ts`](../apps/e2e/support/db.ts)) and then waits for the real sweeper job.
+- **Declines on demand** — the mock gateway declines any booking whose contact email contains
+  `+decline` ([`mock-payment.provider.ts`](../apps/api/src/modules/payments/providers/mock-payment.provider.ts)),
+  like Stripe's decline test cards. The mock is refused in production by config validation.

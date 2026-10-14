@@ -20,6 +20,11 @@ WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'flygo_shadow') \gex
 SELECT 'CREATE DATABASE flygo_test OWNER flygo_app ENCODING ''UTF8'' TEMPLATE template0'
 WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'flygo_test') \gexec
 
+-- Isolated database for the Playwright end-to-end suite (migrated + seeded by its global setup).
+SELECT 'CREATE DATABASE flygo_e2e OWNER flygo_app ENCODING ''UTF8'' TEMPLATE template0'
+WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'flygo_e2e') \gexec
+
 REVOKE ALL ON DATABASE flygo FROM PUBLIC;
 REVOKE ALL ON DATABASE flygo_test FROM PUBLIC;
 REVOKE ALL ON DATABASE flygo_shadow FROM PUBLIC;
+REVOKE ALL ON DATABASE flygo_e2e FROM PUBLIC;

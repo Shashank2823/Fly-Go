@@ -1,0 +1,21 @@
+{
+  "name": "@flygo/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Playwright end-to-end tests: real browser \u2192 web \u2192 API \u2192 worker, against isolated flygo_e2e resources",
+  "scripts": {
+    "e2e": "npm run build -w @flygo/api && playwright test",
+    "e2e:headed": "npm run build -w @flygo/api && playwright test --headed",
+    "e2e:report": "playwright show-report",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "ioredis": "5.11.1",
+    "mongodb": "6.21.0",
+    "pg": "8.23.1",
+    "typescript": "5.9.3"
+  }
+}

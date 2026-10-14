@@ -16,11 +16,16 @@ import type {
 const LEDGER_TTL_SECONDS = 7 * 24 * 3600;
 const ledgerKey = (providerPaymentId: string) => `mockpay:${providerPaymentId}`;
 
+export const isDeclineTestEmail = (email: string | null): boolean =>
+  !!email && /^[^@]*\+decline(\+[^@]*)?@/i.test(email);
+
 /**
  * DEVELOPMENT-ONLY gateway (refused in production by config validation). Behaves like a real
  * asynchronous gateway: accepts the payment as PROCESSING, then "calls our webhook" later by
  * enqueuing a delayed event that goes through the same ingestion path a real webhook would.
- * Outcome is success unless MOCK_PAYMENT_OUTCOME=fail. Its ledger lives in Redis so
+ * Outcome is success unless MOCK_PAYMENT_OUTCOME=fail, or the booking's contact email has
+ * "+decline" in its local part (e.g. asha+decline@example.com) — a per-payment test trigger in
+ * the spirit of Stripe's decline test cards, used by the E2E suite. Its ledger lives in Redis so
  * reconciliation (getPayment) and refunds work like the real thing.
  */
 @Injectable()
@@ -36,7 +41,9 @@ export class MockPaymentProvider implements PaymentProvider {
 
   async createPayment(input: CreatePaymentInput): Promise<CreatePaymentResult> {
     const providerPaymentId = `mockpay_${input.idempotencyKey.replace(/-/g, '')}`;
-    const outcome = this.config.get('MOCK_PAYMENT_OUTCOME');
+    const outcome = isDeclineTestEmail(input.customerEmail)
+      ? 'fail'
+      : this.config.get('MOCK_PAYMENT_OUTCOME');
 
     // Idempotent: the same key returns the existing payment and never "charges" twice.
     const created = await this.redis.set(

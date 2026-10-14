@@ -11,6 +11,8 @@ export interface CreatePaymentInput {
   amountMinor: bigint;
   currency: string;
   bookingReference: string;
+  /** Booking contact email (real gateways use it for receipts; the mock reads a test marker). */
+  customerEmail: string | null;
   /** Forwarded to the provider so a retried submission never charges twice. */
   idempotencyKey: string;
 }
